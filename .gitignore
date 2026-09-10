@@ -1,0 +1,15 @@
+# 编译产物
+/target
+**/target
+
+# 备份文件
+**/*.rs.bk
+*.pdb
+
+# 编辑器 / 系统
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# 注意：Cargo.lock 刻意不忽略 —— 带二进制的项目需要锁定依赖版本，保证可复现构建

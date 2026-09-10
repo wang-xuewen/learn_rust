@@ -1,0 +1,17 @@
+[package]
+name = "calc"
+description = "命令行表达式计算器：词法分析 → 递归下降语法分析 → AST 求值"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme = "README.md"
+keywords = ["calculator", "parser", "interpreter", "cli"]
+categories = ["command-line-utilities"]
+publish = false
+
+[dependencies]
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

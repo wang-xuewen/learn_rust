@@ -1,0 +1,32 @@
+[workspace]
+# 这是一个「多项目工作区」：每个小项目都是 workspace 的一个 member。
+# 新增项目时只要在 projects/ 下建一个 crate 目录即可，无需修改本文件（members 用了通配）。
+resolver = "2"
+members = ["projects/*"]
+
+# ---- 所有子项目共享的元数据（子项目用 xxx.workspace = true 引用）----
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "MIT OR Apache-2.0"
+
+# ---- 所有子项目共享的依赖版本，避免同一个 crate 出现多个版本 ----
+[workspace.dependencies]
+thiserror = "2"
+
+# ---- 所有子项目共享的 lint 规则（子项目里加 [lints] workspace = true 生效）----
+[workspace.lints.rust]
+# priority = -1：让这些具体规则优先于下面的 lint 组（否则 cargo 会报 lint_groups_priority）
+unsafe_code = { level = "forbid", priority = -1 }
+missing_docs = { level = "warn", priority = -1 }
+missing_debug_implementations = { level = "warn", priority = -1 }
+unreachable_pub = { level = "warn", priority = -1 }
+rust_2018_idioms = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+# 团队约定：库代码里不允许 unwrap / expect / panic，必须把错误交给调用方
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
