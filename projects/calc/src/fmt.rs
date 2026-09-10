@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2026 zongge —— 非商业使用免费；商业使用（含商业培训）须事先书面授权，见仓库根目录 LICENSE。
+
 //! 输出格式化：把 `f64` 渲染成人眼友好的字符串。
 //!
 //! 直接 `println!("{}", 0.1 + 0.2)` 会打印 `0.30000000000000004`，

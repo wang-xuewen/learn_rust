@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2026 zongge —— 非商业使用免费；商业使用（含商业培训）须事先书面授权，见仓库根目录 LICENSE。
+
 //! 抽象语法树（AST）定义。
 //!
 //! 语法分析器把 token 流组装成树；求值器遍历这棵树算出结果。

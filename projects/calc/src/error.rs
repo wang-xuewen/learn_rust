@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2026 zongge —— 非商业使用免费；商业使用（含商业培训）须事先书面授权，见仓库根目录 LICENSE。
+
 //! 统一的错误类型。
 //!
 //! 库里所有可能失败的操作都返回 [`CalcError`]，不允许 `unwrap` / `panic`：

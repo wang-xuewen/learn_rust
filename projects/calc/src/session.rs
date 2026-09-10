@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2026 zongge —— 非商业使用免费；商业使用（含商业培训）须事先书面授权，见仓库根目录 LICENSE。
+
 //! 会话层：一次输入一行文本，返回一个结果。
 //!
 //! 它把「词法 → 语法 → 求值」串起来，并在 REPL 里保留变量状态。

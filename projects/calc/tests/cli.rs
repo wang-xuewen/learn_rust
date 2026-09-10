@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+// Copyright (c) 2026 zongge —— 非商业使用免费；商业使用（含商业培训）须事先书面授权，见仓库根目录 LICENSE。
+
 //! 端到端测试：直接跑编译好的二进制，验证 CLI 行为（参数、退出码、stdout/stderr、管道）。
 //!
 //! `env!("CARGO_BIN_EXE_calc")` 由 cargo 在编译测试时注入可执行文件路径。

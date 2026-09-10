@@ -9,7 +9,8 @@ members = ["projects/*"]
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
-license = "MIT OR Apache-2.0"
+# 非商业使用免费，商业使用（含商业培训）须书面授权，见仓库根目录 LICENSE
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
 
 # ---- 所有子项目共享的依赖版本，避免同一个 crate 出现多个版本 ----
 [workspace.dependencies]
