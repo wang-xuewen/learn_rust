@@ -16,6 +16,8 @@ use std::process::ExitCode;
 
 use calc::{format_number, functions, Output, Session};
 
+// env!("CARGO_PKG_VERSION") 是编译期宏，
+// cargo 会在编译时把 Cargo.toml 里的版本号字符串直接替换进来
 /// 版本号来自 `Cargo.toml`，由编译器在编译期展开。
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -64,16 +66,24 @@ fn main() -> ExitCode {
     }
 }
 
+// 这样做的好处：
+// 资源能正常释放	函数返回时，局部变量的 Drop 会正常执行，文件、锁、连接都能清理。
+// 可测试	你可以直接调用 run() 并断言它返回 Ok 还是 Err(2)，不会杀掉测试进程。
+// 控制流清晰	所有错误出口都通过返回值体现，一眼能看出程序可能以哪些码退出。
+// 职责单一	run() 只负责业务逻辑，main 只负责“把结果翻译成进程退出码”。
+// 可复用	run() 可以被别的代码当普通函数调用，不绑死在“进程入口”这个角色上。
 /// 程序主体：把「退出码」显式建模成 `Result<(), u8>`，避免到处 `process::exit`。
 fn run() -> Result<(), u8> {
     let mut interactive = false;
     let mut expr_parts: Vec<String> = Vec::new();
 
     // 直接消费 args 迭代器，避免无谓的 clone
+    // std::env::args() 的第一个元素永远是程序自身的路径/名字，而不是用户传入的参数
     for arg in std::env::args().skip(1) {
+        // match 的匹配是按顺序的
         match arg.as_str() {
             "-h" | "--help" => {
-                print!("{USAGE}");
+                print!("{USAGE}"); // print! 输出到标准输出（stdout）
                 return Ok(());
             }
             "-V" | "--version" => {
@@ -81,8 +91,12 @@ fn run() -> Result<(), u8> {
                 return Ok(());
             }
             "-i" | "--interactive" => interactive = true,
+            // other:一个绑定变量，把当前匹配的值绑定到 other 上（相当于 _ 的具名版本）
+            // if ... 守卫条件，只有条件为 true 时才走这个分支
+            // 为什么要有 other != "-" ：单独的 - 在命令行里是一个约定俗成的特殊值，
+            //     通常表示“标准输入/标准输出”，而不是一个选项
             other if other.starts_with('-') && other != "-" => {
-                eprintln!("未知选项: {other}\n");
+                eprintln!("未知选项: {other}\n");   // eprintln！输出到标准错误（stderr）
                 eprint!("{USAGE}");
                 return Err(2);
             }
