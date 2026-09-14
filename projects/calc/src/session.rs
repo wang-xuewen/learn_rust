@@ -83,7 +83,6 @@ impl Session {
         if line.is_empty() || line.starts_with('#') {
             return Ok(Output::Nothing);
         }
-
         match parse(line)? {
             Stmt::Expr(expr) => {
                 let value = expr.evaluate(&self.ctx)?;

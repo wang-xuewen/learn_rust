@@ -21,6 +21,14 @@ use crate::token::{Token, TokenKind};
 pub struct Lexer<'a> {
     /// 原始输入，只借用不拥有。
     input: &'a str,
+
+    // 为什么 chars 没提 input，却和 input 绑定
+    // 它们没有用名字互相引用，但都用同一个 'a 参数。这个 'a 是「整个 Lexer 结构体所借用的那块字符串的寿命」。
+    // CharIndices<'a> 的 <'a> 不是凭空写的，它表示「这个迭代器借用的字符串的寿命」。
+    // 结构体中 input 和 chars 共享同一个 'a'，所以虽然代码里没有写 chars 引用 input，
+    // 但生命周期参数 'a 已经把两者在编译期牢牢绑在一起——这就是 Rust 用「生命周期参数」
+    // 而非「字段互相引用」来表达「多个借用指向同一块内存且同寿」的方式。
+
     /// 带下标的字符迭代器；`Peekable` 让我们能「偷看」下一个字符而不消耗它。
     chars: Peekable<CharIndices<'a>>,
     /// 是否已经吐出过 `Eof`，避免无限循环。
@@ -97,9 +105,15 @@ impl<'a> Lexer<'a> {
 }
 
 /// 一次产出一个 token；出错时产出 `Err`，调用方用 `collect::<Result<Vec<_>, _>>()` 收敛。
+// <'_> 里的 '_ 是匿名生命周期占位符，意思是「这里有一个生命周期参数，但我懒得（也不需要）给它起名字，编译器你自己推断去」。
+// 为什么这里用 '_ 而不是 'a
+// 关键看 impl 块内部需不需要引用这个生命周期,
+// 在 impl Iterator for Lexer<'_>（lexer.rs:100）里，next 的签名是 
+// fn next(&mut self) -> Option<Self::Item> —— 全程只用到 self，
+// 没有任何地方需要把生命周期写出来。既然用不到名字，就没必要起名，用 _ 更简洁。
 impl Iterator for Lexer<'_> {
     type Item = Result<Token, CalcError>;
-
+// todo
     fn next(&mut self) -> Option<Self::Item> {
         if self.eof_emitted {
             return None;
@@ -143,7 +157,29 @@ impl Iterator for Lexer<'_> {
 ///
 /// 遇到非法字符或格式非法的数字时返回 [`CalcError`]。
 pub fn tokenize(input: &str) -> Result<Vec<Token>, CalcError> {
+    // collect() 不是 Lexer 自己声明的方法，而是 Iterator trait 自带的方法。
+    // Lexer 一旦实现了 Iterator（提供了 next()），
+    // 就能自动获得 collect()、map()、filter() 等一整套方法
+
+    // 这里有两个细节：
+    // 因为 type Item = Result<Token, CalcError>，所以 collect() 默认收集成 Vec<Result<Token, CalcError>>。
+    // 但 tokenize 的返回类型是 Result<Vec<Token>, CalcError>。
+    // 这里利用了一个很方便的特性：Result 也实现了 FromIterator，
+    // 所以 collect() 能把 Vec<Result<_>> 自动「短路」收敛成 Result<Vec<_>> —— 一旦出现 Err，
+    // 整个收集结果就是 Err，否则把所有 Ok 里的 Token 聚成 Vec。这就是注释里说的「错误处理也自然变成 Result<Vec<_>, _>」。
+
+    // Result 类型也实现了 FromIterator trait
+    // 意味着：你可以把一个 Result 的迭代器直接 .collect() 成一个 Result<集合, 错误>——全 Ok 就成功，
+    // 遇到第一个 Err 就整体失败并短路。 这是 Rust 里把“逐个可能失败的操作”聚合成“整体成功或失败”的常用惯用法。
+    
+    // Lexer 结构体实现了Iterator trait。此处就会调用Iterator的collect的方法
+    // Rust 的方法解析顺序是：先看实例自身的方法，没有就去看它实现的 trait 上的方法。
+    // Lexer 没有声明 collect，于是回退到 Iterator trait —— 找到就调用。
     Lexer::new(input).collect()
+
+    // Iterator 中 next方法的实现方式会影响collect返回结果吗
+    // 会，而且 next() 的实现完全决定了 collect() 的结果——collect() 本身没有任何逻辑，
+    // 它就是「反复调 next()，把每次拿到的值存起来，直到 next() 返回 None」。
 }
 
 #[cfg(test)]

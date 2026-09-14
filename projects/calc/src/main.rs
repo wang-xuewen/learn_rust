@@ -95,6 +95,7 @@ fn run() -> Result<(), u8> {
             // if ... 守卫条件，只有条件为 true 时才走这个分支
             // 为什么要有 other != "-" ：单独的 - 在命令行里是一个约定俗成的特殊值，
             //     通常表示“标准输入/标准输出”，而不是一个选项
+            // 这个变量只在守卫条件和该分支的代码块内有效，出了这个分支就不存在
             other if other.starts_with('-') && other != "-" => {
                 eprintln!("未知选项: {other}\n");   // eprintln！输出到标准错误（stderr）
                 eprint!("{USAGE}");
@@ -109,6 +110,7 @@ fn run() -> Result<(), u8> {
     // 1) 命令行直接给了表达式：算完就走
     if !expr_parts.is_empty() {
         let line = expr_parts.join(" ");
+        // todo
         return match session.eval_line(&line) {
             Ok(output) => {
                 print_output(&output);
