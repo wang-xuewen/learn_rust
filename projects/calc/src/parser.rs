@@ -49,6 +49,23 @@ impl Parser {
     ///
     /// 词法或语法错误时返回 [`CalcError`]。
     pub fn parse(input: &str) -> Result<Stmt, CalcError> {
+
+        // tokenize(input) 返回 Result<Vec<Token>, CalcError>
+        // 把 “1 + 2222” 这种字符串变成 [Token, Token, Token, ...] 这种列表
+
+        // 输入 1 + 2 * 3 时，parse_stmt 返回
+        // Stmt::Expr(
+        //     Expr::Binary {
+        //         op: BinaryOp::Add,
+        //         lhs: Expr::Number(1.0),
+        //         rhs: Expr::Binary {
+        //             op: BinaryOp::Mul,
+        //             lhs: Expr::Number(2.0),
+        //             rhs: Expr::Number(3.0),
+        //         },
+        //     }
+        // )
+
         Self::new(tokenize(input)?).parse_stmt()
     }
 
@@ -60,12 +77,17 @@ impl Parser {
     pub fn parse_stmt(&mut self) -> Result<Stmt, CalcError> {
         // 预读两个 token 判断是不是 `ident = ...`；
         // `Peekable` 只支持看 1 个，这里克隆一份迭代器做 2 格预读（Token: Clone，代价很小）。
+        // self.peek_nth(0) 看第 1 个 token，self.peek_nth(1) 看第 2 个 token，组成一个元组模式匹配。
         let assign_target = match (self.peek_nth(0), self.peek_nth(1)) {
             (
+                // 第 1 个 token 是 Ident(name)（标识符，比如 x）
+                // Token 这个结构体除了 kind 字段外，应该还有其它字段
+                // .. 的意思是：剩下的字段我不在乎，不管它们是什么值都匹配。
                 Some(Token {
                     kind: TokenKind::Ident(name),
                     ..
                 }),
+                // 第 2 个 token 是 Assign（即 =）
                 Some(Token {
                     kind: TokenKind::Assign,
                     ..
@@ -73,6 +95,13 @@ impl Parser {
             ) => Some(name.clone()),
             _ => None,
         };
+
+
+        // self.parse_expr_bp(0) — 调用 Pratt 解析（优先级爬升法）的核心函数，解析一个表达式。
+        // parse_expr_bp 是基于"绑定力 (binding power)"的表达式解析器，
+        // 用来正确处理运算符优先级和结合性（比如 1 + 2 * 3 里 * 比 + 优先级高）。
+        // parse_expr_bp 的逻辑是：递归解析时，每遇到一个运算符就比较它的优先级和 min_bp。
+        // 只有优先级 >= min_bp 的运算符才会被本级"吃掉"并继续向右结合；否则就停止、把控制权交回上层。
 
         if let Some(name) = assign_target {
             self.bump(); // ident

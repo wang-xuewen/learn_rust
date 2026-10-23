@@ -41,6 +41,10 @@ impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Self {
             input,
+            // char_indices() 是 Rust 中 str 类型的一个方法，它返回一个迭代器，遍历字符串中的每个字符及其对应的字节索引。
+            // 创建一个能边遍历字符、边知道每个字符字节位置，还能偷看下一个字符而不消耗它」的迭代器，
+            // 赋值给 chars 字段供整个词法分析过程使用。
+            // peekable:可窥视的，可预览的，可偷看的
             chars: input.char_indices().peekable(),
             eof_emitted: false,
         }
@@ -52,10 +56,12 @@ impl<'a> Lexer<'a> {
         let mut seen_dot = first == '.';
         let mut seen_exp = false;
 
+        // self.chars.peek(),只"看一眼"但不消耗它。
         while let Some(&(_, ch)) = self.chars.peek() {
             match ch {
                 c if c.is_ascii_digit() => {
                     text.push(c);
+                    // 真正 取出并消耗 这个字符，迭代器前进到下一个位置。
                     self.chars.next();
                 }
                 '.' if !seen_dot && !seen_exp => {
@@ -113,7 +119,7 @@ impl<'a> Lexer<'a> {
 // 没有任何地方需要把生命周期写出来。既然用不到名字，就没必要起名，用 _ 更简洁。
 impl Iterator for Lexer<'_> {
     type Item = Result<Token, CalcError>;
-// todo
+
     fn next(&mut self) -> Option<Self::Item> {
         if self.eof_emitted {
             return None;

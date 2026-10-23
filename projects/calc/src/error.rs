@@ -9,7 +9,9 @@
 //!
 //! 这里用 [`thiserror::Error`] 派生 `std::error::Error` + `Display`，
 //! 它生成的就是手写实现的那套代码，省掉模板代码但语义完全一致。
-
+//! 
+// thiserror 是 Rust 中用于简化错误类型定义的库，主要通过派生宏 #[derive(Error)] 
+// 自动为自定义错误类型实现 std::error::Error trait。
 use thiserror::Error;
 
 /// 计算器可能出现的全部错误。

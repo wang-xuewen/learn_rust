@@ -110,7 +110,7 @@ fn run() -> Result<(), u8> {
     // 1) 命令行直接给了表达式：算完就走
     if !expr_parts.is_empty() {
         let line = expr_parts.join(" ");
-        // todo
+
         return match session.eval_line(&line) {
             Ok(output) => {
                 print_output(&output);
