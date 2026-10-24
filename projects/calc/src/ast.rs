@@ -96,9 +96,9 @@ pub enum BinaryOp {
     Pow,
 }
 
-// todo
 impl BinaryOp {
     /// 运算符的源码符号。
+    // must_use:用来警告调用者必须使用某个返回值。如果调用者忽略了这个返回值，编译器会发出警告。
     #[must_use]
     pub const fn symbol(self) -> &'static str {
         match self {
@@ -145,6 +145,7 @@ pub enum Expr {
         /// 运算符。
         op: UnaryOp,
         /// 操作数。
+        // Box 在这里不是为了提高性能，而是必须——它用固定大小的指针取代了「内含自身」的无限嵌套
         expr: Box<Expr>,
     },
     /// 二元运算，如 `a + b`。
@@ -161,6 +162,7 @@ pub enum Expr {
         /// 函数名。
         name: String,
         /// 实参列表。
+        // Vec<T> 在栈上只占固定大小（一个指针 + len + capacity，通常 24 字节），它真正的元素数据存在堆上
         args: Vec<Expr>,
     },
 }
@@ -169,13 +171,33 @@ impl fmt::Display for Expr {
     /// 回显 AST：一律加括号，能直观看出优先级与结合性，调试时非常有用。
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            // write! 是 Rust 标准库（std）自带的宏，不是任何第三方 crate。
+            // 它定义在 core::fmt 模块，并由 std::fmt 重导出，完整路径是 std::fmt::write!
+
+            // write! 宏本身不需要手动导入——它是 macro_rules! 宏，
+            // Rust 会自动把 std 里的宏放进作用域（属于「macro prelude」）。
+            // 你文件里写的 use std::fmt; 是为了用 fmt::Formatter、fmt::Result、fmt::Display 
+            // 这些类型/trait，而不是为了 write!。
             Self::Number(n) => write!(f, "{n}"),
             Self::Var(name) => write!(f, "{name}"),
             Self::Unary { op, expr } => write!(f, "({op}{expr})"),
             Self::Binary { op, lhs, rhs } => write!(f, "({lhs} {op} {rhs})"),
             Self::Call { name, args } => {
                 // 迭代器 + join，比手写 for 循环拼字符串更地道
+                // .map(ToString::to_string)：对每个 &Expr 调用 to_string() 转成 String。
+                // ToString::to_string 是函数引用写法，等价于 |e| e.to_string()。
+
+                // 变量遮蔽（shadowing）：右边的 args 是模式匹配绑定出来的 &Vec<Expr>，
+                // 左边 let args 又声明了一个新的 Vec<String>，同名变量遮蔽了旧的。
+                // 这样后面直接用 args.join(", ") 时拿到的就是字符串列表，不用另外起名
+
+                // 一个类型只要实现了 Display，就自动、免费获得 ToString 实现，从而拥有 to_string() 方法。
+                // 顺带一句,这里 to_string 把 Expr 转成 String，会调用你写的那个 fmt 方法。
+                // 而 fmt 里遇到 Call 又会调用 args 里每个 Expr 的 to_string —— 所以这是一个递归的字符串生成过程，
+                // 这也是为什么它能正确处理 pow(2, 10) 这种嵌套调用。
+
                 let args: Vec<String> = args.iter().map(ToString::to_string).collect();
+
                 write!(f, "{name}({})", args.join(", "))
             }
         }
@@ -205,8 +227,14 @@ impl fmt::Display for Stmt {
     }
 }
 
+// #[cfg(test)] 是 Rust 的条件编译属性（conditional compilation attribute）。
+// 它的意思是：只有当前正在运行测试（cargo test）时，才编译这个模块；
+// 正常构建（cargo build / cargo run）时，整块代码被完全忽略，不参与编译。
+// cfg = configuration，条件编译。
+// test 是编译器内置的一个 cfg 标志：用 cargo test 编译时，test 标志为真；用 cargo build 编译时，它为假。
 #[cfg(test)]
 mod tests {
+    // use super::*; 之后，测试可以直接调用同文件里未加 pub 的函数、结构体——这是"单元测试放同文件"的关键便利。
     use super::*;
 
     #[test]
