@@ -96,7 +96,6 @@ pub enum BinaryOp {
     Pow,
 }
 
-// todo
 impl BinaryOp {
     /// 运算符的源码符号。
     #[must_use]

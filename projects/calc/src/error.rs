@@ -18,6 +18,8 @@ use thiserror::Error;
 ///
 /// 每个变体都携带足够的上下文（名字、位置、期望值），
 /// 这样上层（CLI / REPL）可以直接打印出对人类友好的提示。
+//  说明见 error.md
+//  根据每个变体上的 #[error("...")] 生成 Display
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum CalcError {
     /// 词法分析阶段：遇到了不属于本语言字母表的字符。

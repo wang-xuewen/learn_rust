@@ -52,9 +52,14 @@ impl Arity {
 }
 
 /// 一个内置函数。
+//    不是「因为 name 是静态的，所以 Function 是静态的」。正确的说法是：
+//    因为 Function 的每个字段都是 'static 的，所以这个结构体可以被放进 static 表里。
 #[derive(Debug, Clone, Copy)]
 pub struct Function {
     /// 函数名。
+    // &'static str 并不要求字符串「必须在堆或栈里全局变量区」，
+    //     字面量本质上在二进制静态区，但语义上统一表现为「全局有效、永不失效」
+    //     
     pub name: &'static str,
     /// 参数个数约束。
     pub arity: Arity,
@@ -188,6 +193,11 @@ fn require_non_negative(name: &str, value: f64) -> Result<f64, CalcError> {
 }
 
 fn require_in_unit_range(name: &str, value: f64) -> Result<f64, CalcError> {
+    // (-1.0..=1.0) 是一个范围（Range）
+    // -1.0..=1.0	[-1.0, 1.0]	两端都含
+    // Range/RangeInclusive 是标准库定义的普通结构体类型，
+    // 它的值用来描述一个区间（记录起止点）；它本身不做计算，
+    // 而是通过实现各种 trait（RangeBounds、Iterator、Index…）在不同上下文里"发挥作用"。
     if (-1.0..=1.0).contains(&value) {
         Ok(value)
     } else {
@@ -331,6 +341,7 @@ static FUNCTIONS: &[Function] = &[
 /// 按名字查找内置函数。
 #[must_use]
 pub fn lookup_function(name: &str) -> Option<&'static Function> {
+    // 逐个比较 f.name 和传入的 name，返回第一个匹配的项
     FUNCTIONS.iter().find(|f| f.name == name)
 }
 
@@ -362,6 +373,23 @@ impl Context {
     }
 
     /// 写入（或覆盖）一个变量。
+    //  impl Into<String>：泛型参数的简写，接受任何能转换成 String 的类型——传 &str、String 都可以。
+    //    这是为了让调用方不必手动 .to_string()
+    // 它是一个「匿名泛型参数 + trait 约束」的语法糖，等价于：
+    //    pub fn set<N: Into<String>>(&mut self, name: N, value: f64)
+    //    Into<String> 是一个 trait（特征）
+    // Into 和 From 是互逆的
+    //    意思是「只要 String: From<T>，就自动有 T: Into<String>」。
+    //    所以实践中几乎没人直接给类型实现 Into，而是实现 From，Into 自动白送。
+    // 标准库已经写好了，你调用 set("x", 1.0) 时不需要做任何事，
+    //    因为 std 里本来就有 impl From<&str> for String。
+    //    你自己类型的话，需要在自己代码里写一行：
+    //    struct MyName(String);
+    //    impl From<MyName> for String {
+    //        fn from(m: MyName) -> String { m.0 }
+    //    }
+    // 而只实现 Into 时，String::from(my_name) 是用不了的。
+    //    所以推荐写from,From 会自动送你 Into
     pub fn set(&mut self, name: impl Into<String>, value: f64) {
         self.vars.insert(name.into(), value);
     }
@@ -369,6 +397,7 @@ impl Context {
     /// 读取变量值；不存在时返回 `None`。
     #[must_use]
     pub fn get(&self, name: &str) -> Option<f64> {
+        // .copied() 是 Option<&T> 上的一个方法，作用是把 Option<&f64> 转换成 Option<f64>
         self.vars.get(name).copied()
     }
 
@@ -383,7 +412,11 @@ impl Context {
         &self.vars
     }
 }
-
+// 为 Context 类型实现 Default trait，让它可以用 Context::default() 创建一个"默认值"
+// Default 是 Rust 标准库里的 trait，约定是"提供一个合理的默认值"。实现它之后，Context 就能用在这些地方：
+//    let c = Context::default();          // 显式调用
+//    let c: Context = Default::default(); // 完全限定语法
+//    或 let c = <Context as Default>::default(); // 完全限定语法，等价于上面那行
 impl Default for Context {
     fn default() -> Self {
         Self::new()
@@ -406,11 +439,21 @@ pub trait Evaluate {
 impl Evaluate for Expr {
     fn evaluate(&self, ctx: &Context) -> Result<f64, CalcError> {
         match self {
+                // 因为 self 是 &Expr（引用）,value 自动按引用绑定，即 value: &f64
+                // 所以得用 * 把 &f64 解引用成 f64
+                // f64 实现了 Copy，所以 * 是直接按位拷贝出一个新的 f64，开销为零、
+                // 且不需要拿走所有权。Ok(*value) 不会消耗原来的 Expr，方法结束后 self 依然完好。
             Expr::Number(value) => Ok(*value),
+                // ok_or_else 是 Option<T> 上的方法，用于把 Option 转成 Result，
+                // 在 None 时通过闭包惰性生成错误值。
             Expr::Var(name) => ctx
                 .get(name)
                 .ok_or_else(|| CalcError::UnknownVariable { name: name.clone() }),
             Expr::Unary { op, expr } => {
+                // 表达式本身是递归嵌套的：
+                // 实际上是在对内部的那个 Expr 再次调用同一个 evaluate 方法。
+                // Rust 会自动把 Box<Expr> 解引用成 &Expr，重新进入 match self { ... }，
+                // 于是顺着语法树往下一层一层求值。
                 let value = expr.evaluate(ctx)?;
                 match op {
                     UnaryOp::Neg => Ok(-value),
@@ -449,6 +492,22 @@ impl Evaluate for Expr {
                     });
                 }
                 // 迭代器 + collect 直接把 Vec<Result<..>> 收敛成 Result<Vec<..>>
+                // 算出所有实参的值
+                // .collect()：把 Iterator<Item = Result<f64>> 收拢成 Result<Vec<f64>>。
+                // 任意实参出错，整个 values 就是 Err
+                // 外层的圆括号 (func.apply) — 这是必须的，为了解决语法歧义
+                // 如果不写括号，就会变成  func.apply(&values?),但 Function 并没有 apply 方法
+                // 而且也不是我们想要的动作。
+                // 真正"调用/运行函数"的是 (...) 这一对圆括号（(func.apply) 后面紧跟的那对）。调用运算符就是 ()。
+                // (func.apply) 先强制把 apply 当成一个字段值（一个 fn 指针）取出来，
+                // 后面的 (...) 才是调用这个指针。
+                // 顺带一提，其实还有别的写法能避开这个歧义，比如 func.apply.call(...) 之类，
+                // 但 (func.apply)(...) 是最直白、最常见的写法，所以作者用了这个。
+                // Rust 里任意表达式都能用圆括号包起来分组，和数学里 (a + b) * c 的括号是同一套规则
+                // 准确的描述是：括号强制让 func.apply 被当成一个独立的表达式单元先"绑"在一起，
+                // 后面的 () 调用运算符只能作用在这个整体结果上，而不是去和 . 抢着解析。
+                // 一句话总结：(func.apply) = 用通用分组括号把字段访问包成一个整体，
+                // 后面的 (...) 调用这个整体。就这么简单。
                 let values: Result<Vec<f64>, CalcError> =
                     args.iter().map(|arg| arg.evaluate(ctx)).collect();
                 (func.apply)(&values?)
@@ -456,7 +515,7 @@ impl Evaluate for Expr {
         }
     }
 }
-
+// todo
 #[cfg(test)]
 mod tests {
     use super::*;
