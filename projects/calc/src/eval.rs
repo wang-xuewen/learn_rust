@@ -516,6 +516,10 @@ impl Evaluate for Expr {
     }
 }
 // todo
+// 条件编译属性，意思是：只有在运行测试（cargo test）时才编译这段代码，
+// 普通构建（cargo build / cargo run）时会被完全排除。
+// cfg 是条件编译，test 是配置项。cargo test 会自动设置 cfg(test)，cargo build 不会
+// 可以加在任意 item 上：模块、函数、结构体、use 语句等。
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,14 +527,22 @@ mod tests {
 
     /// 解析并求值，取 `f64` 结果。
     fn value_of(input: &str) -> f64 {
+        // 调用 parse(input) 解析输入，如果成功就取出结果绑定到 stmt；如果失败（返回 Err），
+        // 就 panic 并打印 "解析失败" 作为错误信息。
         let stmt = parse(input).expect("解析失败");
         match stmt {
             crate::ast::Stmt::Expr(expr) => expr.evaluate(&Context::new()).expect("求值失败"),
+            // {other:?} 打印的是 stmt 的debug格式的值,
+            // Stmt 实现 Debug（通常 #[derive(Debug)]），否则编译不过。
+            // 类似 Let { name: "x", value: Expr(1.0) } 这样
+            // {:?} = 调试格式，derive 自动生成，字符串带引号、结构体带字段名、枚举带变体名。
+            // {:#?} = 多行美化版。
             other => panic!("期望表达式，实际是 {other:?}"),
         }
     }
 
     #[test]
+    // arithmetic:算数的，四则基本运算
     fn arithmetic_basics() {
         assert_eq!(value_of("1 + 2"), 3.0);
         assert_eq!(value_of("7 - 9"), -2.0);
@@ -541,6 +553,8 @@ mod tests {
     }
 
     #[test]
+    // precedence: 优先级
+    // associativity: 结合性
     fn precedence_and_associativity() {
         assert_eq!(value_of("1 + 2 * 3"), 7.0);
         assert_eq!(value_of("(1 + 2) * 3"), 9.0);
@@ -550,13 +564,16 @@ mod tests {
     }
 
     #[test]
+    // 一元负号，即只有一个操作数的负号运算符
     fn unary_minus() {
+        // 断言结果等于 -3.0；若不等，测试失败并 panic，打印 "断言失败" 和错误信息。
         assert_eq!(value_of("-3"), -3.0);
         assert_eq!(value_of("-(1 + 2)"), -3.0);
         assert_eq!(value_of("3 * -2"), -6.0);
     }
 
     #[test]
+    // builtin: 内置的/内置(函数)等;
     fn builtin_constants() {
         assert_eq!(value_of("pi"), consts::PI);
         assert_eq!(value_of("2 * pi"), consts::TAU);
@@ -566,6 +583,7 @@ mod tests {
     #[test]
     fn function_calls() {
         assert_eq!(value_of("sqrt(16)"), 4.0);
+        // 2.0f64.sqrt(): 把 2.0 当作 f64 类型，调用它的 sqrt() 方法求平方根
         assert_eq!(value_of("pow(2, 0.5)"), 2.0f64.sqrt());
         assert_eq!(value_of("abs(0 - 5)"), 5.0);
         assert_eq!(value_of("max(1, 9, 3)"), 9.0);
@@ -581,9 +599,19 @@ mod tests {
 
     #[test]
     fn division_by_zero_is_an_error() {
+
+        // .expect(msg) → "这里必须是 Ok，否则 panic 打 msg"
+        // .expect_err(msg) → "这里必须是 Err，否则 panic 打 msg"
+
+        // 更清楚的写法应该是把消息写成"期望/应当"的语气
+        // .expect("1/0 应当能正常解析")
         let stmt = parse("1 / 0").expect("解析成功");
         let err = match stmt {
             crate::ast::Stmt::Expr(expr) => {
+                // .expect_err("...") 是 Result 上的方法，
+                // 和 .expect() 正好相反：它要求 Result 是 Err，
+                // 并返回里面的错误值；如果意外是 Ok，它才 panic（带这条消息）。
+                // 所以这里是在断言"这步必须报错"——一旦求值没报错，测试立刻失败。
                 expr.evaluate(&Context::new()).expect_err("除零应该报错")
             }
             other => panic!("期望表达式，实际是 {other:?}"),
